@@ -1,0 +1,5 @@
+# JitPack builds a tag with this file: https://jitpack.io/#Hitice/pix-brcode-java
+jdk:
+  - openjdk21
+install:
+  - ./mvnw -B install -DskipTests -pl pix-brcode,pix-brcode-qrcode -am
