@@ -18,6 +18,33 @@ documents of the Banco Central do Brasil and the EMV QR code specification they 
 It produces the exact payloads printed in the Pix manual examples, byte for byte, and those
 examples are part of the test suite.
 
+## Try it from the command line
+
+The `pix-brcode-cli` module builds a runnable `pix.jar`. With Java 21 installed:
+
+```bash
+git clone https://github.com/Hitice/pix-brcode-java.git
+cd pix-brcode-java
+./mvnw -q package -DskipTests
+java -jar pix-brcode-cli/target/pix.jar
+```
+
+Run without arguments, it asks for the Pix key, the receiver name, the city and an optional
+amount, then prints the copy-and-paste code, draws the QR code in the terminal and saves
+`pix.png`. Scan the terminal or the image with any bank app to check it end to end; a code with
+your own key and R$ 0,01 is a safe test.
+
+The same in one line, or to check a code someone sent you:
+
+```bash
+java -jar pix-brcode-cli/target/pix.jar generate --key you@example.com --name "Your Name" \
+    --city "Sao Paulo" --amount 0,01 --png qr.png
+java -jar pix-brcode-cli/target/pix.jar read "00020126...6304ABCD"
+```
+
+Options for `generate`: `--key`, `--name`, `--city` (required), `--amount` (accepts `12.34`,
+`12,34` and `R$ 1.234,56`), `--txid`, `--description`, `--png`, `--svg`, `--no-qr`.
+
 ## Install
 
 Maven Central publishing is pending. Until then, use JitPack, which builds the library from a Git
@@ -268,6 +295,7 @@ From the BR Code manual, the Pix manual and EMV QRCPS MPM:
 ```bash
 ./mvnw verify                               # tests, coverage gate (85%), javadoc
 ./mvnw -q install -DskipTests && ./mvnw -q -pl examples exec:java   # runs the example
+java -jar pix-brcode-cli/target/pix.jar     # command line tool, after package
 ```
 
 `./mvnw javadoc:javadoc` needs the core module built in the same command or installed first
