@@ -2,25 +2,33 @@
 
 [![CI](https://github.com/Hitice/pix-brcode-java/actions/workflows/ci.yml/badge.svg)](https://github.com/Hitice/pix-brcode-java/actions/workflows/ci.yml)
 [![JitPack](https://jitpack.io/v/Hitice/pix-brcode-java.svg)](https://jitpack.io/#Hitice/pix-brcode-java)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Licença: MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue.svg)](LICENSE)
 
-Java library to generate, parse and validate Pix payment QR codes (BR Code), following the
-documents of the Banco Central do Brasil and the EMV QR code specification they build on.
+Biblioteca Java para **gerar, ler e validar o código do Pix**: o texto do "Pix copia e cola" e o
+QR Code que o app do banco lê. Segue os manuais do Banco Central do Brasil e a especificação EMV de
+QR Code em que eles se baseiam, e vem com uma ferramenta de linha de comando para testar na hora.
 
-- Builds static and dynamic codes, including composite codes with a recurrence location
-  (Pix Automatico).
-- Parses any payload into an immutable object, or lists every problem it has with the position in
-  the payload.
-- Validates Pix keys: CPF, numeric and alphanumeric CNPJ, e-mail, phone and random key.
-- Core module: Java 21, zero runtime dependencies, JPMS module `io.github.hitice.pix.brcode`.
-- Optional module renders the QR image as PNG or SVG with ZXing core.
+![Gerando um Pix pela linha de comando: o copia e cola e o QR desenhado no terminal](docs/images/cli-gerar.png)
 
-It produces the exact payloads printed in the Pix manual examples, byte for byte, and those
-examples are part of the test suite.
+## O que tem aqui
 
-## Try it from the command line
+- **Gera** códigos estáticos (a chave vai dentro do código) e dinâmicos (o código aponta para uma
+  cobrança criada no seu banco), inclusive o código composto com recorrência do Pix Automático.
+- **Lê** qualquer copia e cola e devolve os campos já separados: chave, valor, recebedor, cidade,
+  identificador.
+- **Valida** e aponta cada problema com a posição exata no texto, inclusive código adulterado.
+- **Confere as chaves Pix:** CPF, CNPJ numérico e o **CNPJ alfanumérico** em vigor desde julho de
+  2026, e-mail, telefone e chave aleatória.
+- **Desenha o QR Code** em PNG ou SVG (módulo opcional) ou direto no terminal (ferramenta de linha
+  de comando).
+- **Núcleo sem nenhuma dependência**, Java 21, módulo JPMS `io.github.hitice.pix.brcode`.
 
-The `pix-brcode-cli` module builds a runnable `pix.jar`. With Java 21 installed:
+Os exemplos impressos no manual do Pix saem desta biblioteca **byte a byte iguais**, e fazem parte
+dos testes automáticos.
+
+## Teste em 1 minuto
+
+Com Java 21 instalado:
 
 ```bash
 git clone https://github.com/Hitice/pix-brcode-java.git
@@ -29,26 +37,92 @@ cd pix-brcode-java
 java -jar pix-brcode-cli/target/pix.jar
 ```
 
-Run without arguments, it asks for the Pix key, the receiver name, the city and an optional
-amount, then prints the copy-and-paste code, draws the QR code in the terminal and saves
-`pix.png`. Scan the terminal or the image with any bank app to check it end to end; a code with
-your own key and R$ 0,01 is a safe test.
+O `./mvnw` baixa o Maven sozinho na primeira vez; não precisa instalar nada além do Java.
 
-The same in one line, or to check a code someone sent you:
+Sem argumentos, o programa pergunta:
+
+1. a **chave Pix** (se estiver errada, explica o motivo e pede de novo);
+2. o **nome de quem recebe**, como aparece no banco (até 25 caracteres);
+3. a **cidade** (até 15 caracteres);
+4. o **valor**, opcional: aceita `0,01`, `0.01` e `R$ 1.234,56`; vazio deixa quem paga digitar;
+5. um **identificador** e uma **descrição**, ambos opcionais.
+
+E devolve o copia e cola, o QR Code desenhado no terminal e o arquivo `pix.png` na pasta atual.
+
+**Teste com o seu banco:** use a sua própria chave e o valor `0,01`, aponte a câmera do app do banco
+para o terminal ou para o `pix.png` e confira se aparecem o seu nome, a sua cidade e R$ 0,01. Se
+pagar, o centavo volta para você mesmo.
+
+Tudo numa linha, ou para conferir um código que alguém te mandou:
 
 ```bash
-java -jar pix-brcode-cli/target/pix.jar generate --key you@example.com --name "Your Name" \
-    --city "Sao Paulo" --amount 0,01 --png qr.png
-java -jar pix-brcode-cli/target/pix.jar read "00020126...6304ABCD"
+java -jar pix-brcode-cli/target/pix.jar gerar --chave voce@exemplo.com --nome "Seu Nome" \
+    --cidade "Sao Paulo" --valor 0,01 --png qr.png
+java -jar pix-brcode-cli/target/pix.jar ler "00020126...6304ABCD"
 ```
 
-Options for `generate`: `--key`, `--name`, `--city` (required), `--amount` (accepts `12.34`,
-`12,34` and `R$ 1.234,56`), `--txid`, `--description`, `--png`, `--svg`, `--no-qr`.
+| Opção de `gerar` | Para que serve |
+| --- | --- |
+| `--chave` | Chave Pix de quem recebe (obrigatória) |
+| `--nome` | Nome de quem recebe, até 25 caracteres (obrigatório) |
+| `--cidade` | Cidade de quem recebe, até 15 caracteres (obrigatória) |
+| `--valor` | Valor em reais; sem ele, quem paga digita |
+| `--txid` | Identificador da cobrança, letras e números, até 25 |
+| `--descricao` | Texto que aparece para quem paga |
+| `--png`, `--svg` | Salva o QR Code no arquivo indicado |
+| `--sem-qr` | Não desenha o QR no terminal |
 
-## Install
+Os comandos e opções também aceitam os nomes em inglês (`generate`, `read`, `--key`, `--amount`...).
 
-Maven Central publishing is pending. Until then, use JitPack, which builds the library from a Git
-tag.
+O `ler` mostra os campos de um código válido e, num código adulterado, diz o que está errado e onde:
+
+![Lendo um código válido e um código com o valor alterado](docs/images/cli-ler.png)
+
+## Como funciona o código Pix
+
+O copia e cola é um texto só, montado em campos no formato **ID, tamanho e valor**: dois dígitos
+dizem qual é o campo, dois dígitos dizem quantos caracteres vêm a seguir, e depois vem o valor. Este
+é o código gerado no exemplo de uso mais abaixo:
+
+```
+00020126510014br.gov.bcb.pix0115pix@example.com0210Pedido 123520400005303986540512.345802BR5916Padaria Sao Joao6009Sao Paulo62130509PEDIDO1236304BD94
+```
+
+Separado campo a campo:
+
+| ID | Tamanho | Valor | O que é |
+| --- | --- | --- | --- |
+| `00` | `02` | `01` | Versão do formato, sempre `01` e sempre o primeiro campo |
+| `26` | `51` | (os três subcampos abaixo) | Dados da conta de quem recebe |
+| `  00` | `14` | `br.gov.bcb.pix` | Identifica que é um Pix |
+| `  01` | `15` | `pix@example.com` | A chave Pix |
+| `  02` | `10` | `Pedido 123` | Descrição para quem paga |
+| `52` | `04` | `0000` | Categoria do comerciante (`0000` quando não se aplica) |
+| `53` | `03` | `986` | Moeda: 986 é o real |
+| `54` | `05` | `12.34` | Valor, com ponto; sem este campo, quem paga digita |
+| `58` | `02` | `BR` | País |
+| `59` | `16` | `Padaria Sao Joao` | Nome de quem recebe |
+| `60` | `09` | `Sao Paulo` | Cidade de quem recebe |
+| `62` | `13` | `0509PEDIDO123` | Dados adicionais: o subcampo `05` é o identificador da cobrança |
+| `63` | `04` | `BD94` | CRC, o dígito verificador do código inteiro |
+
+Alguns pontos que costumam confundir:
+
+- **CRC:** os 4 últimos caracteres são um cálculo (CRC-16) sobre todo o resto do texto. Mudar um único
+  caractere, como o valor, faz o CRC não bater, e o app do banco recusa o código. É assim que a
+  biblioteca detecta adulteração.
+- **Estático e dinâmico:** no estático, a chave e o valor estão dentro do código, que pode ser
+  impresso e reaproveitado. No dinâmico, o código só traz um endereço (campo `25` em vez da chave)
+  onde o banco de quem recebe serve a cobrança; o valor e os dados ficam lá. Esta biblioteca monta
+  o código dinâmico, mas a cobrança em si é criada na API Pix do seu banco.
+- **Acentos:** nome e cidade aceitam só caracteres ASCII, pela especificação EMV. Por isso
+  "Uberlândia" vira "Uberlandia" e "São Paulo" vira "Sao Paulo" no código.
+- **Sem identificador:** quando não há identificador, o campo `62` leva `***`.
+
+## Instalação
+
+A publicação no Maven Central está pendente. Até lá, use o JitPack, que compila a biblioteca direto a
+partir de uma tag do Git.
 
 ### JitPack
 
@@ -67,7 +141,7 @@ Maven:
   <artifactId>pix-brcode</artifactId>
   <version>v0.1.0</version>
 </dependency>
-<!-- Optional, for QR images -->
+<!-- Opcional, para gerar a imagem do QR Code -->
 <dependency>
   <groupId>com.github.Hitice.pix-brcode-java</groupId>
   <artifactId>pix-brcode-qrcode</artifactId>
@@ -85,11 +159,11 @@ repositories {
 
 dependencies {
     implementation("com.github.Hitice.pix-brcode-java:pix-brcode:v0.1.0")
-    implementation("com.github.Hitice.pix-brcode-java:pix-brcode-qrcode:v0.1.0") // optional
+    implementation("com.github.Hitice.pix-brcode-java:pix-brcode-qrcode:v0.1.0") // opcional
 }
 ```
 
-### Maven Central (after the first release)
+### Maven Central (depois da primeira versão)
 
 Maven:
 
@@ -99,7 +173,7 @@ Maven:
   <artifactId>pix-brcode</artifactId>
   <version>0.1.0</version>
 </dependency>
-<!-- Optional, for QR images -->
+<!-- Opcional, para gerar a imagem do QR Code -->
 <dependency>
   <groupId>io.github.hitice</groupId>
   <artifactId>pix-brcode-qrcode</artifactId>
@@ -112,16 +186,16 @@ Gradle (Kotlin DSL):
 ```kotlin
 dependencies {
     implementation("io.github.hitice:pix-brcode:0.1.0")
-    implementation("io.github.hitice:pix-brcode-qrcode:0.1.0") // optional
+    implementation("io.github.hitice:pix-brcode-qrcode:0.1.0") // opcional
 }
 ```
 
-With JPMS, add `requires io.github.hitice.pix.brcode;` (or `io.github.hitice.pix.brcode.qrcode`,
-which requires the core module transitively).
+Com JPMS, adicione `requires io.github.hitice.pix.brcode;` (ou `io.github.hitice.pix.brcode.qrcode`,
+que já inclui o núcleo).
 
-## Quick start
+## Uso no código
 
-Static code: the key and the payment data travel inside the payload.
+Código estático: a chave e os dados do pagamento vão dentro do código.
 
 ```java
 import io.github.hitice.pix.brcode.BrCode;
@@ -131,24 +205,22 @@ import java.math.BigDecimal;
 import java.nio.file.Path;
 
 BrCode code = BrCode.staticPayment()
-        .key(PixKey.email("pix@example.com"))     // or .key("pix@example.com") to detect the type
+        .key(PixKey.email("pix@example.com"))     // ou .key("pix@example.com") para detectar o tipo
         .merchantName("Padaria Sao Joao")
-        .merchantCity("S\u00e3o Paulo")            // accents are removed: "Sao Paulo"
-        .amount(new BigDecimal("12.34"))           // optional; without it the payer types the amount
-        .txid("PEDIDO123")                         // optional; without it the payload has ***
-        .description("Pedido 123")                 // optional
+        .merchantCity("São Paulo")                 // o acento é removido: "Sao Paulo"
+        .amount(new BigDecimal("12.34"))           // opcional; sem ele, quem paga digita o valor
+        .txid("PEDIDO123")                         // opcional; sem ele, o código leva ***
+        .description("Pedido 123")                 // opcional
         .build();
 
-String copiaECola = code.payload();
-// 00020126510014br.gov.bcb.pix0115pix@example.com0210Pedido 123520400005303986540512.345802BR
-// 5916Padaria Sao Joao6009Sao Paulo62130509PEDIDO1236304BD94   (one line)
+String copiaECola = code.payload();               // o texto da tabela acima
 
-BrCodeQr.of(code).writePng(Path.of("pix.png"), 8);   // 8 pixels per module
+BrCodeQr.of(code).writePng(Path.of("pix.png"), 8);   // 8 pixels por módulo do QR
 String svg = BrCodeQr.of(code).toSvg(8);
 ```
 
-Dynamic code: the payload carries the location where your PSP serves the charge (created with the
-Pix API of your PSP). The location has no `https://` prefix.
+Código dinâmico: o código traz o endereço onde o seu banco serve a cobrança, criada antes pela API
+Pix dele. O endereço vai sem `https://`.
 
 ```java
 BrCode dynamic = BrCode.dynamicPayment()
@@ -158,153 +230,190 @@ BrCode dynamic = BrCode.dynamicPayment()
         .build();
 ```
 
-## Parsing and validation
+## Ler e validar
 
-`parse` returns the decoded code or throws `BrCodeException` with the first problem:
+`parse` devolve o código já separado em campos, ou lança `BrCodeException` com o primeiro problema
+encontrado:
 
 ```java
-BrCode code = BrCode.parse(payload);
+BrCode code = BrCode.parse(copiaECola);
 
-code.type();                 // STATIC, DYNAMIC or RECURRENCE_ONLY
+code.type();                 // STATIC, DYNAMIC ou RECURRENCE_ONLY
 code.key();                  // Optional<PixKey>
-code.location();             // Optional<String>, dynamic codes
-code.amount();               // Optional<BigDecimal>, scale 2
-code.txid();                 // Optional<String>, empty for ***
+code.location();             // Optional<String>, nos códigos dinâmicos
+code.amount();               // Optional<BigDecimal>, com 2 casas
+code.txid();                 // Optional<String>, vazio quando é ***
 code.merchantName();
 code.merchantCity();
-code.recurrenceLocation();   // Optional<String>, composite codes
+code.recurrenceLocation();   // Optional<String>, nos códigos com recorrência
 ```
 
-`validate` never throws for a bad payload and lists every problem, each with a category and the
-zero based position in the payload:
+`validate` nunca lança exceção por código inválido e lista todos os problemas, cada um com a
+categoria e a posição (contada a partir de zero):
 
 ```java
-// The quick start payload with the merchant name edited to 26 characters, CRC left as it was.
-String edited = code.payload().replace("5916Padaria Sao Joao", "5926Padaria Sao Joao Ltda XYZ1");
+// O código do exemplo com o nome trocado por um de 26 caracteres, sem recalcular o CRC.
+String editado = code.payload().replace("5916Padaria Sao Joao", "5926Padaria Sao Joao Ltda XYZ1");
 
-ValidationResult result = BrCode.validate(edited);
+ValidationResult result = BrCode.validate(editado);
 if (!result.isValid()) {
     for (Problem p : result.problems()) {
-        System.out.println(p.code() + " at " + p.position() + ": " + p.message());
+        System.out.println(p.code() + " na posição " + p.position() + ": " + p.message());
     }
 }
-// CRC_MISMATCH at 155: CRC mismatch: expected A5F3, found BD94
-// INVALID_LENGTH at 93: Merchant name (59) has 26 characters, the maximum is 25
+// CRC_MISMATCH na posição 155: CRC mismatch: expected A5F3, found BD94
+// INVALID_LENGTH na posição 93: Merchant name (59) has 26 characters, the maximum is 25
 ```
 
-Problem categories (`ErrorCode`): `TRUNCATED`, `MALFORMED_TLV`, `INVALID_LENGTH`, `DUPLICATE_ID`,
-`UNKNOWN_ID`, `MISPLACED_FIELD`, `MISSING_FIELD`, `INVALID_VALUE`, `INVALID_CHARACTER`,
-`CRC_MISMATCH`, `INVALID_KEY`, `INVALID_AMOUNT`, `INVALID_TXID`, `CONFLICTING_FIELDS`, `NOT_PIX`.
-Structural problems come first, then the CRC, then field rules.
+As mensagens da biblioteca são em inglês, para quem integra; a ferramenta de linha de comando
+explica cada categoria em português.
 
-The parser accepts what the specifications allow and the builder never produces: payment templates
-of other arrangements (card schemes, IDs 02 to 51 and 80 to 99), the Pix template in any ID from 26
-to 51, an upper case GUI, amounts written as `98` or `98.`, a postal code, tip fields (55 to 57) and
-the language template (64).
+| Categoria (`ErrorCode`) | Significado |
+| --- | --- |
+| `TRUNCATED` | O código termina antes do fim de um campo |
+| `MALFORMED_TLV` | Um campo não segue o formato ID, tamanho e valor |
+| `INVALID_LENGTH` | Um campo passa do tamanho permitido |
+| `DUPLICATE_ID` | O mesmo campo aparece duas vezes |
+| `UNKNOWN_ID` | Campo que a especificação não define |
+| `MISPLACED_FIELD` | Campo fora da posição obrigatória (o `00` vem primeiro, o `63` por último) |
+| `MISSING_FIELD` | Falta um campo obrigatório |
+| `INVALID_VALUE` | Valor fora do permitido para o campo |
+| `INVALID_CHARACTER` | Caractere que o campo não aceita |
+| `CRC_MISMATCH` | O CRC não bate: o código foi alterado ou corrompido |
+| `INVALID_KEY` | Chave Pix inválida |
+| `INVALID_AMOUNT` | Valor em reais inválido |
+| `INVALID_TXID` | Identificador da cobrança inválido |
+| `CONFLICTING_FIELDS` | Campos que não podem aparecer juntos |
+| `NOT_PIX` | Não é um código Pix |
 
-## Pix keys
+Os problemas de estrutura aparecem primeiro, depois o CRC, depois as regras de cada campo.
 
-`PixKey.of(String)` detects the type. The typed factories accept formatted input and normalize it.
-A `PixKey` always holds the canonical value, the one written in the payload.
+O leitor aceita o que a especificação permite, mesmo que o gerador desta biblioteca nunca produza:
+modelos de outros arranjos de pagamento (bandeiras de cartão, IDs 02 a 51 e 80 a 99), o modelo Pix em
+qualquer ID de 26 a 51, o identificador `BR.GOV.BCB.PIX` em maiúsculas, valores escritos como `98` ou
+`98.`, CEP, campos de gorjeta (55 a 57) e o modelo de idioma (64).
 
-| Type | Factory | Accepted input | Canonical value |
+## Chaves Pix
+
+`PixKey.of(String)` descobre o tipo sozinho. As funções específicas aceitam o texto formatado e
+normalizam. Uma `PixKey` sempre guarda o valor canônico, que é o que vai escrito no código.
+
+| Tipo | Função | Aceita | Valor guardado |
 | --- | --- | --- | --- |
-| CPF | `PixKey.cpf` | `123.456.789-09`, `12345678909` | 11 digits, check digits verified, repeated digits rejected |
-| CNPJ | `PixKey.cnpj` | `12.ABC.345/01DE-35`, `00038166000105` | 12 characters `[0-9A-Z]` and 2 check digits; numeric and alphanumeric CNPJ |
-| E-mail | `PixKey.email` | `Pix@Example.com` | lower case, at most 77 characters, DICT regular expression |
-| Phone | `PixKey.phone` | `+55 (61) 91234-5678`, `61912345678` | `+55`, area code, 9 digit mobile number starting with 9 |
-| Random key | `PixKey.evp` | UUID in any case, or `java.util.UUID` | lower case UUID with hyphens |
+| CPF | `PixKey.cpf` | `123.456.789-09`, `12345678909` | 11 dígitos, dígitos verificadores conferidos, números repetidos recusados |
+| CNPJ | `PixKey.cnpj` | `12.ABC.345/01DE-35`, `00038166000105` | 12 caracteres `[0-9A-Z]` e 2 dígitos verificadores; CNPJ numérico e alfanumérico |
+| E-mail | `PixKey.email` | `Pix@Example.com` | minúsculas, até 77 caracteres, expressão regular do DICT |
+| Telefone | `PixKey.phone` | `+55 (61) 91234-5678`, `61912345678` | `+55`, DDD e celular de 9 dígitos começando por 9 |
+| Chave aleatória | `PixKey.evp` | UUID em qualquer caixa, ou `java.util.UUID` | UUID em minúsculas, com hífens |
 
-Detection rules of `PixKey.of`: `@` means e-mail, a leading `+` means phone, a UUID means random key,
-and after removing `. / -` and spaces, 11 digits mean CPF and 14 characters mean CNPJ. A national
-phone number without `+55` reads as a CPF, so use `PixKey.phone` for it.
+Como o `PixKey.of` decide o tipo: `@` indica e-mail; `+` no começo indica telefone; um UUID indica
+chave aleatória; depois de tirar `. / -` e espaços, 11 dígitos indicam CPF e 14 caracteres indicam
+CNPJ. Um telefone sem o `+55` seria lido como CPF, então para ele use `PixKey.phone`.
 
-The alphanumeric CNPJ check digits use the Receita Federal rule: each character is worth its ASCII
-code minus 48, then modulo 11 with weights 2 to 9 from the right. For digits this is the same as the
-numeric CNPJ rule, so one algorithm validates both.
+**CNPJ alfanumérico:** a Receita Federal passou a emitir CNPJ com letras a partir de julho de 2026. O
+dígito verificador usa a regra da Receita: cada caractere vale o seu código ASCII menos 48, e depois
+é módulo 11 com pesos de 2 a 9 a partir da direita. Para dígitos, isso dá o mesmo resultado da regra
+antiga, então um único algoritmo valida os dois formatos. Os testes usam os vetores da rotina
+oficial do Serpro.
 
-## Rules implemented
+## Regras implementadas
 
-From the BR Code manual, the Pix manual and EMV QRCPS MPM:
+Do Manual do BR Code, do Manual de Padrões para Iniciação do Pix e da especificação EMV QRCPS MPM:
 
-- Data objects are ID (2 digits), length (2 digits, 01 to 99) and value. Lengths count characters.
-- `00` payload format indicator `01` comes first; `63` CRC comes last.
-- `01` point of initiation method is optional: `11` reusable, `12` single use.
-- A merchant account template from 26 to 51 holds the GUI `br.gov.bcb.pix` (case insensitive) in
-  `00` and either the key in `01` (static) or the location in `25` (dynamic). The template has at
-  most 99 characters, so the key (up to 77), the description `02` (up to 72) and the withdrawal
-  facilitator `03` (8 digit ISPB, 12 characters with ID and length) share that space.
-- `52` merchant category code (4 digits, `0000` by default), `53` currency `986`, `58` country `BR`.
-- `54` amount: optional, up to 13 characters, digits and a dot, at most 2 decimals, not zero.
-- `59` merchant name up to 25 and `60` merchant city up to 15 characters, printable ASCII (EMV
-  "ans" format). The builder removes accents (Unicode NFD, combining marks dropped) and keeps case.
-- `61` postal code optional.
-- `62` additional data field template with `05` transaction ID. In static codes: up to 25 characters
-  `A-Z a-z 0-9`, or `***` when there is none. Dynamic codes always carry `***` from the builder;
-  when parsing, their transaction ID must only be printable ASCII, since the payer ignores it.
-- `80` to `99` with the Pix GUI and `25`: recurrence location of composite codes.
-- `63` CRC-16/CCITT-FALSE (polynomial `0x1021`, initial value `0xFFFF`) over the whole payload up to
-  and including `6304`, written as 4 upper case hexadecimal digits.
-- Locations have no scheme, at most 77 characters.
+- Cada campo é ID (2 dígitos), tamanho (2 dígitos, de 01 a 99) e valor. O tamanho conta
+  caracteres.
+- O `00` (versão do formato, valor `01`) vem primeiro; o `63` (CRC) vem por último.
+- O `01` (forma de iniciação) é opcional: `11` reutilizável, `12` uso único.
+- Um modelo de conta entre 26 e 51 traz o identificador `br.gov.bcb.pix` (sem diferenciar
+  maiúsculas) no `00`, e a chave no `01` (estático) ou o endereço no `25` (dinâmico). O modelo tem no
+  máximo 99 caracteres, então a chave (até 77), a descrição `02` (até 72) e o facilitador de saque
+  `03` (ISPB de 8 dígitos, 12 caracteres com ID e tamanho) dividem esse espaço.
+- `52` categoria do comerciante (4 dígitos, `0000` por padrão), `53` moeda `986`, `58` país `BR`.
+- `54` valor: opcional, até 13 caracteres, dígitos e ponto, no máximo 2 casas, diferente de zero.
+- `59` nome com até 25 e `60` cidade com até 15 caracteres, ASCII imprimível (formato "ans" da
+  EMV). O gerador remove os acentos (Unicode NFD, marcas combinantes descartadas) e mantém
+  maiúsculas e minúsculas.
+- `61` CEP opcional.
+- `62` dados adicionais com o `05` identificador da cobrança. No estático: até 25 caracteres
+  `A-Z a-z 0-9`, ou `***` quando não há. No dinâmico, o gerador sempre usa `***`; na leitura, o
+  identificador só precisa ser ASCII imprimível, porque o app de quem paga o ignora.
+- `80` a `99` com o identificador Pix e o `25`: endereço de recorrência dos códigos compostos.
+- `63` CRC-16/CCITT-FALSE (polinômio `0x1021`, valor inicial `0xFFFF`) sobre o código inteiro até
+  `6304` inclusive, escrito com 4 dígitos hexadecimais maiúsculos.
+- Endereços sem `https://`, com até 77 caracteres.
 
-## Specification references
+## Referências
 
-| Document | Version used | Used for |
+| Documento | Versão usada | Usado para |
 | --- | --- | --- |
-| [Manual de Padroes para Iniciacao do Pix](https://www.bcb.gov.br/content/estabilidadefinanceira/pix/Regulamento_Pix/II_ManualdePadroesparaIniciacaodoPix.pdf), Banco Central do Brasil | 2.10.0 | Pix template, key formats in the payload, txid rules, examples in sections 2.6.3, 2.7.2 and 2.8.5 |
-| [Manual do BR Code](https://www.bcb.gov.br/content/estabilidadefinanceira/spb_docs/ManualBRCode.pdf), Banco Central do Brasil | 2.0.1 | Common BR Code fields, mandatory 62-05, example in section 2.2 |
-| [EMV QR Code Specification for Payment Systems, Merchant-Presented Mode](https://www.emvco.com/emv-technologies/qr-codes/), EMVCo | 1.1 | TLV rules, field order, formats N, ans and S, amount format, CRC, byte mode and UTF-8 ECI |
-| [Manual Operacional do DICT](https://www.bcb.gov.br/content/estabilidadefinanceira/pix/Regulamento_Pix/X_ManualOperacionaldoDICT.pdf), Banco Central do Brasil | 8.5 | Key types and formats, alphanumeric CNPJ keys |
-| [DICT API specification](https://github.com/bacen/pix-dict-api) (`openapi.yaml`), Banco Central do Brasil | 1.8.0 | E-mail and random key regular expressions, 77 character limit |
-| [CNPJ alfanumerico, perguntas e respostas](https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/perguntas-e-respostas/cnpj/cnpj-alfanumerico.pdf), Receita Federal (IN RFB 2.229/2024) | April 2026 | Alphanumeric CNPJ format and check digit calculation |
-| [Validation routines](https://www.serpro.gov.br/menu/noticias/videos/cnpj-alfanumerico.zip), Serpro | 2022 | Check digit reference implementation and test vectors |
+| [Manual de Padrões para Iniciação do Pix](https://www.bcb.gov.br/content/estabilidadefinanceira/pix/Regulamento_Pix/II_ManualdePadroesparaIniciacaodoPix.pdf), Banco Central do Brasil | 2.10.0 | Modelo Pix, formato das chaves no código, regras do identificador, exemplos das seções 2.6.3, 2.7.2 e 2.8.5 |
+| [Manual do BR Code](https://www.bcb.gov.br/content/estabilidadefinanceira/spb_docs/ManualBRCode.pdf), Banco Central do Brasil | 2.0.1 | Campos comuns do BR Code, `62-05` obrigatório, exemplo da seção 2.2 |
+| [EMV QR Code Specification for Payment Systems, Merchant-Presented Mode](https://www.emvco.com/emv-technologies/qr-codes/), EMVCo | 1.1 | Formato ID-tamanho-valor, ordem dos campos, formatos N, ans e S, formato do valor, CRC, modo byte e ECI UTF-8 |
+| [Manual Operacional do DICT](https://www.bcb.gov.br/content/estabilidadefinanceira/pix/Regulamento_Pix/X_ManualOperacionaldoDICT.pdf), Banco Central do Brasil | 8.5 | Tipos e formatos de chave, chave CNPJ alfanumérica |
+| [Especificação da API do DICT](https://github.com/bacen/pix-dict-api) (`openapi.yaml`), Banco Central do Brasil | 1.8.0 | Expressões regulares de e-mail e chave aleatória, limite de 77 caracteres |
+| [CNPJ alfanumérico, perguntas e respostas](https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/perguntas-e-respostas/cnpj/cnpj-alfanumerico.pdf), Receita Federal (IN RFB 2.229/2024) | abril de 2026 | Formato do CNPJ alfanumérico e cálculo do dígito verificador |
+| [Rotinas de validação](https://www.serpro.gov.br/menu/noticias/videos/cnpj-alfanumerico.zip), Serpro | 2022 | Implementação de referência do dígito verificador e vetores de teste |
 
-## Design notes
+Dois achados nos próprios manuais, documentados nos testes: o exemplo do Manual do BR Code usa o
+identificador `RP12345678-2019`, com um hífen que a regra do Pix estático não permite; e o CPF de
+exemplo do manual do Pix (`12345678900`) tem os dígitos verificadores errados, porque é só uma
+ilustração de formato.
 
-- Zero dependencies in the core. The QR module depends only on ZXing core and writes PNG itself, so
-  it does not need `java.desktop`.
-- Immutable values. `BrCode`, `PixKey` (a record), `Problem` (a record) and `ValidationResult` are
-  immutable and thread safe. Builders are not thread safe.
-- Always valid. A `BrCode` exists only after every rule passed; a `PixKey` only holds a canonical,
-  validated key.
-- No nulls. Optional fields return `Optional`; arguments are checked with `Objects.requireNonNull`.
-- Money as `BigDecimal` with scale 2. Amounts with more than 2 decimal places are rejected instead
-  of rounded.
-- Errors: invalid builder arguments throw `IllegalArgumentException`, a missing mandatory field
-  throws `IllegalStateException` on `build()`, and invalid payloads throw `BrCodeException` (or are
-  reported by `validate`).
-- Equality: two codes are equal when their payloads are equal. A parsed code keeps the exact text it
-  was read from.
+## Decisões de projeto
 
-## Limitations
+- **Núcleo sem dependências.** O módulo de QR depende só do ZXing core e grava o PNG por conta
+  própria, então não precisa de `java.desktop`.
+- **Objetos imutáveis.** `BrCode`, `PixKey` (record), `Problem` (record) e `ValidationResult` são
+  imutáveis e seguros entre threads. Os builders não são.
+- **Sempre válido.** Um `BrCode` só existe depois de passar por todas as regras; uma `PixKey` só
+  guarda uma chave canônica e conferida.
+- **Sem null.** Campo opcional devolve `Optional`; argumentos são conferidos com
+  `Objects.requireNonNull`.
+- **Dinheiro em `BigDecimal` com 2 casas.** Valor com mais de 2 casas é recusado, não arredondado.
+- **Erros previsíveis:** argumento inválido no builder lança `IllegalArgumentException`; campo
+  obrigatório ausente lança `IllegalStateException` no `build()`; código inválido lança
+  `BrCodeException` (ou aparece no `validate`).
+- **Igualdade pelo texto:** dois códigos são iguais quando o copia e cola é igual. Um código lido
+  guarda exatamente o texto de onde veio.
 
-- It does not talk to banks, to the DICT or to the Pix API. A valid payload can still carry a key
-  that is not registered.
-- It does not create the server side of dynamic codes: the charge, its location URL and the JSON
-  payload served there come from your PSP.
-- No PSP integration, payment confirmation or webhook handling.
-- No builder for composite codes that carry only a recurrence location; they are parsed.
-- The parser checks the Pix rules for fields that payer apps ignore (such as the merchant name
-  format) as strictly as the specifications state. Use `validate` to see every finding.
-- A parsed payload made only of characters of the QR alphanumeric set (digits, upper case letters
-  and ` $%*+-./:`) is encoded by ZXing in alphanumeric mode instead of byte mode. Payloads built by
-  this library always contain the lower case GUI and use byte mode.
+## Limitações
 
-## Building
+- Não conversa com bancos, com o DICT nem com a API Pix. Um código válido pode trazer uma chave que
+  não está cadastrada em lugar nenhum.
+- Não cria o lado servidor do código dinâmico: a cobrança, o endereço e o conteúdo servido nele vêm
+  do seu banco (PSP).
+- Não confirma pagamento nem trata webhook.
+- Não há builder para o código composto que só traz o endereço de recorrência; ele é lido
+  normalmente.
+- O leitor confere as regras do Pix com o rigor da especificação, inclusive em campos que os apps de
+  pagamento ignoram (como o formato do nome). Use `validate` para ver todos os apontamentos.
+- Um código lido que tenha só caracteres do conjunto alfanumérico do QR (dígitos, letras maiúsculas
+  e ` $%*+-./:`) é codificado pelo ZXing em modo alfanumérico em vez de modo byte. Os códigos gerados
+  por esta biblioteca sempre têm o identificador em minúsculas e usam modo byte.
+
+## Compilar e testar
 
 ```bash
-./mvnw verify                               # tests, coverage gate (85%), javadoc
-./mvnw -q install -DskipTests && ./mvnw -q -pl examples exec:java   # runs the example
-java -jar pix-brcode-cli/target/pix.jar     # command line tool, after package
+./mvnw verify                                 # testes, cobertura mínima de 85% e javadoc
+./mvnw -q package -DskipTests                 # gera pix-brcode-cli/target/pix.jar
+./mvnw -q install -DskipTests && ./mvnw -q -pl examples exec:java   # roda o exemplo em Java
 ```
 
-`./mvnw javadoc:javadoc` needs the core module built in the same command or installed first
+O `./mvnw javadoc:javadoc` precisa do núcleo compilado no mesmo comando ou instalado antes
 (`./mvnw compile javadoc:javadoc`).
 
-## Contributing
+| Módulo | O que é |
+| --- | --- |
+| `pix-brcode` | Núcleo: gerar, ler e validar; sem dependências |
+| `pix-brcode-qrcode` | Imagem do QR Code em PNG e SVG, com ZXing |
+| `pix-brcode-cli` | Ferramenta de linha de comando (`pix.jar`); não é publicada no Maven |
+| `examples` | Exemplo executável em Java |
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Release steps are in [RELEASING.md](RELEASING.md).
+## Contribuir
 
-## License
+Veja o [CONTRIBUTING.md](CONTRIBUTING.md). Os passos para publicar uma versão estão no
+[RELEASING.md](RELEASING.md).
+
+## Licença
 
 [MIT](LICENSE), Copyright (c) 2026 Pedro Henrique Fernandes.

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.hitice.pix.brcode.BrCode;
+import io.github.hitice.pix.brcode.PixKey;
 import io.github.hitice.pix.brcode.qrcode.BrCodeQr;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -13,6 +14,8 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -42,7 +45,7 @@ class PixCliTest {
     private static String payloadLine(String output) {
         String[] lines = output.split("\\R");
         for (int i = 0; i < lines.length - 1; i++) {
-            if (lines[i].equals("Pix copy and paste:")) {
+            if (lines[i].equals("Pix copia e cola:")) {
                 return lines[i + 1];
             }
         }
@@ -50,25 +53,34 @@ class PixCliTest {
     }
 
     @Test
-    void generatesAValidCodeFromArguments() {
-        int code = run("", "generate", "--key", "pix@example.com", "--name", "Maria Souza",
-                "--city", "São Paulo", "--amount", "0,01", "--txid", "TESTE1",
-                "--description", "Teste", "--no-qr");
+    void generatesAValidCodeFromPortugueseOptions() {
+        int code = run("", "gerar", "--chave", "pix@example.com", "--nome", "Maria Souza",
+                "--cidade", "São Paulo", "--valor", "0,01", "--txid", "TESTE1",
+                "--descricao", "Teste", "--sem-qr");
 
         assertThat(code).isEqualTo(PixCli.OK);
         String payload = payloadLine(out());
         assertThat(BrCode.validate(payload).isValid()).isTrue();
         assertThat(payload).contains("54040.01").contains("Sao Paulo");
-        assertThat(out()).contains("(EMAIL)").contains("R$ 0.01").doesNotContain("\u001b[");
+        assertThat(out()).contains("(e-mail)").contains("R$ 0,01").doesNotContain("\u001b[");
+    }
+
+    @Test
+    void acceptsTheEnglishNamesToo() {
+        int code = run("", "generate", "--key", "pix@example.com", "--name", "Maria",
+                "--city", "Recife", "--amount", "5", "--description", "Bolo", "--no-qr");
+
+        assertThat(code).isEqualTo(PixCli.OK);
+        assertThat(payloadLine(out())).contains("54045.00");
     }
 
     @Test
     void drawsTheQrInTheTerminalByDefault() {
-        int code = run("", "generate", "--key", "pix@example.com", "--name", "Maria",
-                "--city", "Recife");
+        int code = run("", "gerar", "--chave", "pix@example.com", "--nome", "Maria",
+                "--cidade", "Recife");
 
         assertThat(code).isEqualTo(PixCli.OK);
-        assertThat(out()).contains("▀").contains("open, the payer types it");
+        assertThat(out()).contains("▀").contains("aberto, quem paga digita");
     }
 
     @Test
@@ -76,50 +88,51 @@ class PixCliTest {
         Path png = dir.resolve("out/qr.png");
         Path svg = dir.resolve("out/qr.svg");
 
-        int code = run("", "generate", "--key", "pix@example.com", "--name", "Maria",
-                "--city", "Recife", "--png", png.toString(), "--svg", svg.toString(), "--no-qr");
+        int code = run("", "gerar", "--chave", "pix@example.com", "--nome", "Maria",
+                "--cidade", "Recife", "--png", png.toString(), "--svg", svg.toString(), "--sem-qr");
 
         assertThat(code).isEqualTo(PixCli.OK);
         assertThat(Files.readAllBytes(png)).startsWith((byte) 0x89, (byte) 'P', (byte) 'N', (byte) 'G');
         assertThat(Files.readString(svg)).startsWith("<?xml").contains("<svg");
+        assertThat(out()).contains("QR salvo em");
     }
 
     @Test
     void rejectsAnInvalidKey() {
-        int code = run("", "generate", "--key", "123", "--name", "Maria", "--city", "Recife");
+        int code = run("", "gerar", "--chave", "123", "--nome", "Maria", "--cidade", "Recife");
 
         assertThat(code).isEqualTo(PixCli.INVALID);
-        assertThat(err()).startsWith("Error:");
+        assertThat(err()).startsWith("Erro:");
     }
 
     @Test
     void rejectsANameOverTheLimit() {
-        int code = run("", "generate", "--key", "pix@example.com",
-                "--name", "A".repeat(26), "--city", "Recife");
+        int code = run("", "gerar", "--chave", "pix@example.com",
+                "--nome", "A".repeat(26), "--cidade", "Recife");
 
         assertThat(code).isEqualTo(PixCli.INVALID);
     }
 
     @Test
     void reportsMissingRequiredOption() {
-        int code = run("", "generate", "--key", "pix@example.com", "--name", "Maria");
+        int code = run("", "gerar", "--chave", "pix@example.com", "--nome", "Maria");
 
         assertThat(code).isEqualTo(PixCli.USAGE);
-        assertThat(err()).contains("Missing --city").contains("Usage:");
+        assertThat(err()).contains("Falta --cidade").contains("Uso:");
     }
 
     @Test
     void reportsUnknownOptionAndMissingValue() {
-        assertThat(run("", "generate", "--color", "red")).isEqualTo(PixCli.USAGE);
-        assertThat(run("", "generate", "--key")).isEqualTo(PixCli.USAGE);
+        assertThat(run("", "gerar", "--cor", "azul")).isEqualTo(PixCli.USAGE);
+        assertThat(run("", "gerar", "--chave")).isEqualTo(PixCli.USAGE);
     }
 
     @Test
     void reportsUnknownCommandAndPrintsHelp() {
-        assertThat(run("", "pay")).isEqualTo(PixCli.USAGE);
-        assertThat(run("", "read")).isEqualTo(PixCli.USAGE);
-        assertThat(run("", "--help")).isEqualTo(PixCli.OK);
-        assertThat(out()).contains("Usage:");
+        assertThat(run("", "pagar")).isEqualTo(PixCli.USAGE);
+        assertThat(run("", "ler")).isEqualTo(PixCli.USAGE);
+        assertThat(run("", "ajuda")).isEqualTo(PixCli.OK);
+        assertThat(out()).contains("Uso:");
     }
 
     @Test
@@ -128,22 +141,22 @@ class PixCliTest {
                 .merchantCity("Recife").amount(new BigDecimal("5.00")).txid("ABC")
                 .description("Bolo").build().payload();
 
-        int code = run("", "read", payload);
+        int code = run("", "ler", payload);
 
         assertThat(code).isEqualTo(PixCli.OK);
-        assertThat(out()).contains("Valid Pix code").contains("Maria, Recife")
-                .contains("R$ 5.00").contains("Identifier:  ABC").contains("Description: Bolo");
+        assertThat(out()).contains("Codigo Pix valido (estatico)").contains("Maria, Recife")
+                .contains("R$ 5,00").contains("Identificador:  ABC").contains("Descricao:      Bolo");
     }
 
     @Test
-    void readsADynamicPayload() {
+    void readsADynamicPayloadWithTheEnglishCommand() {
         String payload = BrCode.dynamicPayment().location("pix.example.com/qr/v2/abc")
                 .merchantName("Maria").merchantCity("Recife").build().payload();
 
         int code = run("", "read", payload);
 
         assertThat(code).isEqualTo(PixCli.OK);
-        assertThat(out()).contains("Location:    pix.example.com/qr/v2/abc");
+        assertThat(out()).contains("(dinamico)").contains("Endereco:       pix.example.com/qr/v2/abc");
     }
 
     @Test
@@ -151,22 +164,30 @@ class PixCliTest {
         String payload = BrCode.staticPayment().key("pix@example.com").merchantName("Maria")
                 .merchantCity("Recife").amount(new BigDecimal("5.00")).build().payload();
 
-        int code = run("", "read", payload.replace("5.00", "9.00"));
+        int code = run("", "ler", payload.replace("5.00", "9.00"));
 
         assertThat(code).isEqualTo(PixCli.INVALID);
-        assertThat(err()).contains("CRC_MISMATCH");
+        assertThat(err()).contains("Codigo Pix invalido")
+                .contains("CRC_MISMATCH: o codigo foi alterado ou corrompido").contains("posicao");
+    }
+
+    @Test
+    void explainsEveryProblemCategoryInPortuguese() {
+        for (io.github.hitice.pix.brcode.ErrorCode code : io.github.hitice.pix.brcode.ErrorCode.values()) {
+            assertThat(PixCli.explain(code)).as(code.name()).isNotBlank();
+        }
     }
 
     @Test
     void interactiveModeAsksAndSavesPng() {
-        String input = "not-a-key\npix@example.com\nMaria Souza\nRecife\n0,01\nPEDIDO1\nBolo\n";
+        String input = "nao-e-chave\npix@example.com\nMaria Souza\nRecife\n0,01\nPEDIDO1\nBolo\n";
 
         int code = run(input);
 
         assertThat(code).isEqualTo(PixCli.OK);
-        assertThat(out()).contains("Recognized as EMAIL").contains("R$ 0.01")
-                .contains("QR image saved to");
-        assertThat(err()).contains("Not a Pix key");
+        assertThat(out()).contains("Reconhecida como e-mail").contains("R$ 0,01")
+                .contains("QR salvo em");
+        assertThat(err()).contains("Chave invalida");
         assertThat(dir.resolve("pix.png")).exists();
     }
 
@@ -175,20 +196,29 @@ class PixCliTest {
         int code = run("pix@example.com\nMaria\nRecife\n\n\n\n");
 
         assertThat(code).isEqualTo(PixCli.OK);
-        assertThat(out()).contains("open, the payer types it");
+        assertThat(out()).contains("aberto, quem paga digita");
     }
 
     @Test
     void interactiveModeStopsWithoutKeyOrAfterThreeBadKeys() {
         assertThat(run("\n")).isEqualTo(PixCli.INVALID);
         assertThat(run("a\nb\nc\n")).isEqualTo(PixCli.INVALID);
-        assertThat(err()).contains("no valid key after 3 attempts");
+        assertThat(err()).contains("nenhuma chave valida em 3 tentativas");
     }
 
     @Test
     void interactiveModeRequiresNameAndCity() {
         assertThat(run("pix@example.com\n")).isEqualTo(PixCli.INVALID);
-        assertThat(err()).contains("name and city are required");
+        assertThat(err()).contains("nome e cidade sao obrigatorios");
+    }
+
+    @Test
+    void labelsEveryKeyAndCodeTypeInPortuguese() {
+        assertThat(PixCli.label(PixKey.Type.CPF)).isEqualTo("CPF");
+        assertThat(PixCli.label(PixKey.Type.CNPJ)).isEqualTo("CNPJ");
+        assertThat(PixCli.label(PixKey.Type.PHONE)).isEqualTo("telefone");
+        assertThat(PixCli.label(PixKey.Type.EVP)).isEqualTo("chave aleatoria");
+        assertThat(PixCli.label(BrCode.Type.RECURRENCE_ONLY)).isEqualTo("so recorrencia");
     }
 
     @Test
@@ -206,8 +236,7 @@ class PixCliTest {
         BrCodeQr qr = BrCodeQr.of(BrCode.staticPayment().key("pix@example.com")
                 .merchantName("Maria").merchantCity("Recife").amount(new BigDecimal("0.01")).build());
         int quiet = TerminalQr.QUIET_ZONE;
-        java.util.regex.Matcher cell = java.util.regex.Pattern
-                .compile("\u001b\\[(30|97);(40|107)m▀").matcher("");
+        Matcher cell = Pattern.compile("\u001b\\[(30|97);(40|107)m▀").matcher("");
 
         String[] rows = TerminalQr.render(qr).split("\\R");
 
