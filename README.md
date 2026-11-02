@@ -6,9 +6,10 @@
 
 Biblioteca Java para **gerar, ler e validar o código do Pix**: o texto do "Pix copia e cola" e o
 QR Code que o app do banco lê. Segue os manuais do Banco Central do Brasil e a especificação EMV de
-QR Code em que eles se baseiam, e vem com uma ferramenta de linha de comando para testar na hora.
+QR Code em que eles se baseiam, e vem com um programa pronto para gerar e conferir Pix, com janela
+ou pelo terminal.
 
-![Gerando um Pix pela linha de comando: o copia e cola e o QR desenhado no terminal](docs/images/cli-gerar.png)
+![A janela do programa: chave reconhecida enquanto você digita, QR Code e copia e cola prontos](docs/images/janela-gerar.png)
 
 ## O que tem aqui
 
@@ -19,64 +20,95 @@ QR Code em que eles se baseiam, e vem com uma ferramenta de linha de comando par
 - **Valida** e aponta cada problema com a posição exata no texto, inclusive código adulterado.
 - **Confere as chaves Pix:** CPF, CNPJ numérico e o **CNPJ alfanumérico** em vigor desde julho de
   2026, e-mail, telefone e chave aleatória.
-- **Desenha o QR Code** em PNG ou SVG (módulo opcional) ou direto no terminal (ferramenta de linha
-  de comando).
+- **Desenha o QR Code** em PNG ou SVG (módulo opcional), na janela do programa ou direto no
+  terminal.
 - **Núcleo sem nenhuma dependência**, Java 21, módulo JPMS `io.github.hitice.pix.brcode`.
 
 Os exemplos impressos no manual do Pix saem desta biblioteca **byte a byte iguais**, e fazem parte
 dos testes automáticos.
 
-## Teste em 1 minuto
+## Usar o programa
 
-Com Java 21 instalado:
+Baixe o `pix.jar` da [última versão](https://github.com/Hitice/pix-brcode-java/releases/latest) e
+abra com Java 21. Ou compile você mesmo:
 
 ```bash
 git clone https://github.com/Hitice/pix-brcode-java.git
 cd pix-brcode-java
-./mvnw -q package -DskipTests
-java -jar pix-brcode-cli/target/pix.jar
+./mvnw -q package -DskipTests        # gera pix-brcode-cli/target/pix.jar
 ```
 
 O `./mvnw` baixa o Maven sozinho na primeira vez; não precisa instalar nada além do Java.
 
-Sem argumentos, o programa pergunta:
+### Com janela
 
-1. a **chave Pix** (se estiver errada, explica o motivo e pede de novo);
-2. o **nome de quem recebe**, como aparece no banco (até 25 caracteres);
-3. a **cidade** (até 15 caracteres);
-4. o **valor**, opcional: aceita `0,01`, `0.01` e `R$ 1.234,56`; vazio deixa quem paga digitar;
-5. um **identificador** e uma **descrição**, ambos opcionais.
+Abra o `pix.jar` com dois cliques, ou rode `java -jar pix.jar janela`.
 
-E devolve o copia e cola, o QR Code desenhado no terminal e o arquivo `pix.png` na pasta atual.
+1. Digite a **chave Pix**. O programa reconhece o tipo enquanto você digita (CPF, CNPJ, e-mail,
+   telefone ou chave aleatória) e avisa se ela estiver errada.
+2. Digite o **valor**, se quiser. Aceita `0,01`, `0.01` e `R$ 1.234,56`; vazio deixa quem paga
+   digitar.
+3. Clique em **Gerar**. O QR Code aparece na tela, com o copia e cola embaixo.
+4. Use **Copiar copia e cola** para mandar por mensagem, ou **Salvar imagem** para imprimir.
 
-**Teste com o seu banco:** use a sua própria chave e o valor `0,01`, aponte a câmera do app do banco
-para o terminal ou para o `pix.png` e confira se aparecem o seu nome, a sua cidade e R$ 0,01. Se
-pagar, o centavo volta para você mesmo.
+Nome, cidade, identificador e descrição são opcionais. A aba **Conferir código** recebe um copia e
+cola qualquer e mostra os campos, ou o que está errado nele.
+
+![A aba Conferir código mostrando os campos de um Pix válido](docs/images/janela-conferir.png)
+
+No Mac, o dois cliques precisa de um Java instalado no sistema (por exemplo o
+[Temurin 21](https://adoptium.net/)). Se o Java estiver só na pasta do usuário, como o que vem com
+as IDEs da JetBrains, abra pelo Terminal com `java -jar pix.jar janela`.
+
+### Pelo terminal
+
+`java -jar pix.jar` no terminal faz as perguntas na ordem: a chave (obrigatória), o valor e os
+campos opcionais, em que Enter pula. Depois mostra o copia e cola, desenha o QR Code no próprio
+terminal e salva `pix.png` na pasta atual.
+
+![Gerando um Pix pelo terminal, só com a chave e o valor](docs/images/cli-gerar.png)
 
 Tudo numa linha, ou para conferir um código que alguém te mandou:
 
 ```bash
-java -jar pix-brcode-cli/target/pix.jar gerar --chave voce@exemplo.com --nome "Seu Nome" \
-    --cidade "Sao Paulo" --valor 0,01 --png qr.png
-java -jar pix-brcode-cli/target/pix.jar ler "00020126...6304ABCD"
+java -jar pix.jar gerar --chave voce@exemplo.com --valor 0,01 --png qr.png
+java -jar pix.jar ler "00020126...6304ABCD"
 ```
 
 | Opção de `gerar` | Para que serve |
 | --- | --- |
-| `--chave` | Chave Pix de quem recebe (obrigatória) |
-| `--nome` | Nome de quem recebe, até 25 caracteres (obrigatório) |
-| `--cidade` | Cidade de quem recebe, até 15 caracteres (obrigatória) |
+| `--chave` | Chave Pix de quem recebe (a única obrigatória) |
 | `--valor` | Valor em reais; sem ele, quem paga digita |
+| `--nome` | Nome no QR, até 25 caracteres; sem ele, usa "Recebedor Pix" |
+| `--cidade` | Cidade no QR, até 15 caracteres; sem ela, usa "Brasil" |
 | `--txid` | Identificador da cobrança, letras e números, até 25 |
 | `--descricao` | Texto que aparece para quem paga |
 | `--png`, `--svg` | Salva o QR Code no arquivo indicado |
 | `--sem-qr` | Não desenha o QR no terminal |
 
-Os comandos e opções também aceitam os nomes em inglês (`generate`, `read`, `--key`, `--amount`...).
+Os comandos e opções também aceitam os nomes em inglês (`generate`, `read`, `window`, `--key`,
+`--amount`...).
 
 O `ler` mostra os campos de um código válido e, num código adulterado, diz o que está errado e onde:
 
 ![Lendo um código válido e um código com o valor alterado](docs/images/cli-ler.png)
+
+### Teste com o seu banco
+
+Use a sua própria chave e o valor `0,01`, aponte a câmera do app do banco para a tela ou para a
+imagem e confira se aparecem o valor e o seu nome. Se pagar, o centavo volta para você mesmo.
+
+### Por que o programa não busca o nome e o banco pela chave
+
+O app do banco mostra o nome do dono da chave porque consulta o **DICT**, o diretório de chaves do
+Banco Central. Esse acesso é exclusivo dos bancos e instituições participantes do Pix, exige
+certificado ICP-Brasil e conexão autenticada, e é vigiado para impedir que alguém descubra nomes a
+partir de chaves, que são dado pessoal. Não existe consulta pública, então um programa aberto não
+tem como fazer isso.
+
+E não faz falta: num código estático, o nome e a cidade escritos no QR são informativos. Na hora de
+pagar, o banco de quem paga consulta o DICT e mostra o nome verdadeiro do dono da chave antes da
+confirmação. Por isso aqui eles são opcionais.
 
 ## Como funciona o código Pix
 
@@ -406,7 +438,7 @@ O `./mvnw javadoc:javadoc` precisa do núcleo compilado no mesmo comando ou inst
 | --- | --- |
 | `pix-brcode` | Núcleo: gerar, ler e validar; sem dependências |
 | `pix-brcode-qrcode` | Imagem do QR Code em PNG e SVG, com ZXing |
-| `pix-brcode-cli` | Ferramenta de linha de comando (`pix.jar`); não é publicada no Maven |
+| `pix-brcode-cli` | Programa com janela e terminal (`pix.jar`); não é publicado no Maven |
 | `examples` | Exemplo executável em Java |
 
 ## Contribuir

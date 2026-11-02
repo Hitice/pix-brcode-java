@@ -44,6 +44,9 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <useModulePath>false</useModulePath>
+          <systemPropertyVariables>
+            <java.awt.headless>true</java.awt.headless>
+          </systemPropertyVariables>
         </configuration>
       </plugin>
       <plugin>

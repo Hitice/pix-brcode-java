@@ -2,31 +2,31 @@ package io.github.hitice.pix.brcode.cli;
 
 import io.github.hitice.pix.brcode.BrCode;
 import io.github.hitice.pix.brcode.BrCodeException;
-import io.github.hitice.pix.brcode.ErrorCode;
 import io.github.hitice.pix.brcode.PixKey;
-import io.github.hitice.pix.brcode.Problem;
-import io.github.hitice.pix.brcode.ValidationResult;
 import io.github.hitice.pix.brcode.qrcode.BrCodeQr;
+import java.awt.GraphicsEnvironment;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.io.UncheckedIOException;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
- * Command line tool: generates a static Pix code from a key, or reads and checks a payload.
- * Messages are in Portuguese, since Pix is a Brazilian payment system; commands and options
- * also accept their English names.
+ * Generates a static Pix code from a key, or reads and checks a payload. Opened with a double
+ * click (no terminal), it shows a window; in a terminal it asks questions or takes commands.
+ * Messages are in Portuguese, since Pix is a Brazilian payment system; commands and options also
+ * accept their English names.
  *
  * <pre>
- * java -jar pix.jar                       asks for the fields
- * java -jar pix.jar gerar --chave ... --nome ... --cidade ... [--valor 0,01] [--png qr.png]
+ * java -jar pix.jar                       window, or questions when run in a terminal
+ * java -jar pix.jar janela                window
+ * java -jar pix.jar gerar --chave ... [--valor 0,01] [--png qr.png]
  * java -jar pix.jar ler "000201..."
  * </pre>
  */
@@ -38,7 +38,6 @@ public final class PixCli {
 
     private static final int KEY_ATTEMPTS = 3;
     private static final int PNG_MODULE_SIZE = 8;
-    private static final String OPEN_AMOUNT = "aberto, quem paga digita";
 
     /** Option name, in Portuguese or English, to the internal name used below. */
     private static final Map<String, String> VALUE_OPTIONS = Map.ofEntries(
@@ -67,13 +66,29 @@ public final class PixCli {
     /**
      * Entry point.
      *
-     * @param args command and options; none starts the interactive mode
+     * @param args command and options; none opens the window, or asks questions in a terminal
      */
     public static void main(String[] args) {
+        boolean noTerminal = System.console() == null;
+        if (wantsWindow(args, noTerminal, GraphicsEnvironment.isHeadless())) {
+            PixWindow.open();
+            return;
+        }
         PixCli cli = new PixCli(
                 new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8)),
                 System.out, System.err, Path.of("").toAbsolutePath());
         System.exit(cli.run(args));
+    }
+
+    /** A double click starts the jar with no arguments and no terminal: that gets the window. */
+    static boolean wantsWindow(String[] args, boolean noTerminal, boolean headless) {
+        if (headless) {
+            return false;
+        }
+        if (args.length == 1 && (args[0].equals("janela") || args[0].equals("window"))) {
+            return true;
+        }
+        return args.length == 0 && noTerminal;
     }
 
     int run(String[] args) {
@@ -81,8 +96,10 @@ public final class PixCli {
             return interactive();
         }
         return switch (args[0]) {
+            case "terminal" -> interactive();
             case "gerar", "generate" -> generateFromArgs(args);
-            case "ler", "read" -> args.length == 2 ? read(args[1]) : usageError("ler recebe um codigo");
+            case "ler", "read" -> args.length == 2 ? read(args[1]) : usageError("ler recebe um c\u00f3digo");
+            case "janela", "window" -> usageError("sem tela dispon\u00edvel para abrir a janela");
             case "ajuda", "help", "-h", "--help" -> {
                 usage(out);
                 yield OK;
@@ -100,56 +117,48 @@ public final class PixCli {
             } else if (VALUE_OPTIONS.containsKey(name) && i + 1 < args.length) {
                 options.put(VALUE_OPTIONS.get(name), args[++i]);
             } else {
-                return usageError("Opcao desconhecida ou sem valor: " + name);
+                return usageError("Op\u00e7\u00e3o desconhecida ou sem valor: " + name);
             }
         }
-        for (String[] required : new String[][] {{"key", "--chave"}, {"name", "--nome"}, {"city", "--cidade"}}) {
-            if (!options.containsKey(required[0])) {
-                return usageError("Falta " + required[1]);
-            }
+        if (!options.containsKey("key")) {
+            return usageError("Falta --chave");
         }
         return generate(options);
     }
 
     private int interactive() {
-        out.println("Gerador de codigo Pix. Aperte Enter para pular os campos opcionais.");
+        out.println("Gerador de c\u00f3digo Pix. S\u00f3 a chave \u00e9 obrigat\u00f3ria; Enter pula os outros campos.");
         Map<String, String> options = new HashMap<>();
         String key = askKey();
         if (key == null) {
             return INVALID;
         }
         options.put("key", key);
-        String name = ask("Nome de quem recebe, como aparece no banco (ate 25 caracteres): ");
-        String city = ask("Cidade (ate 15 caracteres): ");
-        if (name.isEmpty() || city.isEmpty()) {
-            err.println("Erro: nome e cidade sao obrigatorios.");
-            return INVALID;
-        }
-        options.put("name", name);
-        options.put("city", city);
-        putIfPresent(options, "amount", ask("Valor, por exemplo 0,01 (vazio deixa quem paga digitar): "));
-        putIfPresent(options, "txid", ask("Identificador, letras e numeros ate 25 (opcional): "));
-        putIfPresent(options, "description", ask("Descricao (opcional): "));
+        options.put("amount", ask("Valor, por exemplo 0,01 (vazio deixa quem paga digitar): "));
+        options.put("name", ask("Nome no QR, at\u00e9 25 caracteres (Enter usa \"" + PixForm.DEFAULT_NAME + "\"): "));
+        options.put("city", ask("Cidade no QR, at\u00e9 15 caracteres (Enter usa \"" + PixForm.DEFAULT_CITY + "\"): "));
+        options.put("txid", ask("Identificador, letras e n\u00fameros at\u00e9 25 (opcional): "));
+        options.put("description", ask("Descri\u00e7\u00e3o (opcional): "));
         options.put("png", workDir.resolve("pix.png").toString());
         return generate(options);
     }
 
     private String askKey() {
         for (int attempt = 0; attempt < KEY_ATTEMPTS; attempt++) {
-            String key = ask("Chave Pix (CPF, CNPJ, e-mail, telefone +55... ou chave aleatoria): ");
+            String key = ask("Chave Pix (CPF, CNPJ, e-mail, telefone +55... ou chave aleat\u00f3ria): ");
             if (key.isEmpty()) {
-                err.println("Erro: a chave e obrigatoria.");
+                err.println("Erro: a chave \u00e9 obrigat\u00f3ria.");
                 return null;
             }
-            try {
-                PixKey parsed = PixKey.of(key);
-                out.println("  Reconhecida como " + label(parsed.type()) + ": " + parsed.value());
+            String status = PixForm.keyStatus(key);
+            if (status.startsWith("Chave inv\u00e1lida")) {
+                err.println("  " + status);
+            } else {
+                out.println("  " + status);
                 return key;
-            } catch (IllegalArgumentException e) {
-                err.println("  Chave invalida: " + e.getMessage());
             }
         }
-        err.println("Erro: nenhuma chave valida em " + KEY_ATTEMPTS + " tentativas.");
+        err.println("Erro: nenhuma chave v\u00e1lida em " + KEY_ATTEMPTS + " tentativas.");
         return null;
     }
 
@@ -164,72 +173,11 @@ public final class PixCli {
         }
     }
 
-    private static void putIfPresent(Map<String, String> options, String name, String value) {
-        if (!value.isEmpty()) {
-            options.put(name, value);
-        }
-    }
-
-    static String label(PixKey.Type type) {
-        return switch (type) {
-            case CPF -> "CPF";
-            case CNPJ -> "CNPJ";
-            case EMAIL -> "e-mail";
-            case PHONE -> "telefone";
-            case EVP -> "chave aleatoria";
-        };
-    }
-
-    static String explain(ErrorCode code) {
-        return switch (code) {
-            case TRUNCATED -> "o codigo termina antes do fim de um campo";
-            case MALFORMED_TLV -> "um campo nao segue o formato ID, tamanho e valor";
-            case INVALID_LENGTH -> "um campo passa do tamanho permitido";
-            case DUPLICATE_ID -> "o mesmo campo aparece duas vezes";
-            case UNKNOWN_ID -> "campo que a especificacao nao define";
-            case MISPLACED_FIELD -> "campo fora da posicao obrigatoria";
-            case MISSING_FIELD -> "falta um campo obrigatorio";
-            case INVALID_VALUE -> "valor fora do permitido para o campo";
-            case INVALID_CHARACTER -> "caractere que o campo nao aceita";
-            case CRC_MISMATCH -> "o codigo foi alterado ou corrompido";
-            case INVALID_KEY -> "chave Pix invalida";
-            case INVALID_AMOUNT -> "valor em reais invalido";
-            case INVALID_TXID -> "identificador da transacao invalido";
-            case CONFLICTING_FIELDS -> "campos que nao podem aparecer juntos";
-            case NOT_PIX -> "nao e um codigo Pix";
-        };
-    }
-
-    static String label(BrCode.Type type) {
-        return switch (type) {
-            case STATIC -> "estatico";
-            case DYNAMIC -> "dinamico";
-            case RECURRENCE_ONLY -> "so recorrencia";
-        };
-    }
-
-    private static String money(BigDecimal amount) {
-        return "R$ " + amount.toPlainString().replace('.', ',');
-    }
-
     private int generate(Map<String, String> options) {
         BrCode code;
         try {
-            BrCode.StaticBuilder builder = BrCode.staticPayment()
-                    .key(options.get("key"))
-                    .merchantName(options.get("name"))
-                    .merchantCity(options.get("city"));
-            BigDecimal amount = parseAmount(options.getOrDefault("amount", ""));
-            if (amount != null) {
-                builder.amount(amount);
-            }
-            if (options.containsKey("txid")) {
-                builder.txid(options.get("txid"));
-            }
-            if (options.containsKey("description")) {
-                builder.description(options.get("description"));
-            }
-            code = builder.build();
+            code = PixForm.build(options.get("key"), options.get("amount"), options.get("name"),
+                    options.get("city"), options.get("txid"), options.get("description"));
         } catch (IllegalArgumentException | IllegalStateException | BrCodeException e) {
             err.println("Erro: " + e.getMessage());
             return INVALID;
@@ -237,9 +185,10 @@ public final class PixCli {
 
         PixKey key = code.key().orElseThrow();
         out.println();
-        out.println("Chave:     " + key.value() + " (" + label(key.type()) + ")");
+        out.println("Chave:     " + key.value() + " (" + PixForm.label(key.type()) + ")");
         out.println("Recebedor: " + code.merchantName() + ", " + code.merchantCity());
-        out.println("Valor:     " + code.amount().map(PixCli::money).orElse(OPEN_AMOUNT));
+        out.println("Valor:     " + code.amount().map(PixForm::money).orElse(PixForm.OPEN_AMOUNT));
+        out.println(PixForm.PAYER_NOTE);
         out.println();
         out.println("Pix copia e cola:");
         out.println(code.payload());
@@ -263,7 +212,7 @@ public final class PixCli {
                 out.println("QR salvo em " + svg);
             }
         } catch (IOException e) {
-            err.println("Erro: nao foi possivel gravar a imagem: " + e.getMessage());
+            err.println("Erro: n\u00e3o foi poss\u00edvel gravar a imagem: " + e.getMessage());
             return INVALID;
         }
         return OK;
@@ -277,44 +226,16 @@ public final class PixCli {
     }
 
     private int read(String payload) {
-        ValidationResult result = BrCode.validate(payload);
-        if (!result.isValid()) {
-            err.println("Codigo Pix invalido:");
-            for (Problem problem : result.problems()) {
-                err.println("  " + problem.code() + ": " + explain(problem.code())
-                        + " (" + problem.message() + ", posicao " + problem.position() + ")");
-            }
+        List<String> problems = PixForm.problems(payload);
+        if (!problems.isEmpty()) {
+            err.println("C\u00f3digo Pix inv\u00e1lido:");
+            problems.forEach(p -> err.println("  " + p));
             return INVALID;
         }
-        BrCode code = BrCode.parse(payload);
-        out.println("Codigo Pix valido (" + label(code.type()) + ")");
-        code.key().ifPresent(k -> out.println("Chave:          " + k.value() + " (" + label(k.type()) + ")"));
-        code.location().ifPresent(l -> out.println("Endereco:       " + l));
-        out.println("Recebedor:      " + code.merchantName() + ", " + code.merchantCity());
-        out.println("Valor:          " + code.amount().map(PixCli::money).orElse(OPEN_AMOUNT));
-        code.txid().ifPresent(t -> out.println("Identificador:  " + t));
-        code.description().ifPresent(d -> out.println("Descricao:      " + d));
-        out.println("CRC:            " + code.crc());
+        BrCode code = BrCode.parse(payload.strip());
+        out.println("C\u00f3digo Pix v\u00e1lido (" + PixForm.label(code.type()) + ")");
+        PixForm.describe(code).forEach(out::println);
         return OK;
-    }
-
-    /**
-     * Accepts "12.34", "12,34", "1.234,56" and "R$ 0,01". Returns null for an empty string.
-     */
-    static BigDecimal parseAmount(String text) {
-        String value = text.replace("R$", "").replace(" ", "").strip();
-        if (value.isEmpty()) {
-            return null;
-        }
-        if (value.contains(",")) {
-            value = value.replace(".", "").replace(',', '.');
-        }
-        try {
-            return new BigDecimal(value);
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(
-                    "o valor deve ser como 12,34 ou 12.34, veio \"" + text + "\"", e);
-        }
     }
 
     private int usageError(String message) {
@@ -327,14 +248,16 @@ public final class PixCli {
         stream.println("""
                 Uso:
                   java -jar pix.jar
-                      Pergunta a chave, o nome, a cidade e o valor, mostra o copia e cola,
-                      desenha o QR no terminal e salva pix.png.
-                  java -jar pix.jar gerar --chave CHAVE --nome NOME --cidade CIDADE
-                      [--valor 0,01] [--txid ID] [--descricao TEXTO]
+                      Abre a janela. Num terminal, pergunta a chave e o valor (o resto \u00e9
+                      opcional), mostra o copia e cola, desenha o QR e salva pix.png.
+                  java -jar pix.jar janela | terminal
+                      For\u00e7a a janela ou as perguntas no terminal.
+                  java -jar pix.jar gerar --chave CHAVE [--valor 0,01]
+                      [--nome NOME] [--cidade CIDADE] [--txid ID] [--descricao TEXTO]
                       [--png qr.png] [--svg qr.svg] [--sem-qr]
                   java -jar pix.jar ler CODIGO
                       Confere um copia e cola e mostra os campos.
-                Os comandos e opcoes tambem aceitam os nomes em ingles
-                (generate, read, --key, --name, --city, --amount, --description, --no-qr).""");
+                Os comandos e op\u00e7\u00f5es tamb\u00e9m aceitam os nomes em ingl\u00eas
+                (generate, read, window, --key, --name, --city, --amount, --description, --no-qr).""");
     }
 }
