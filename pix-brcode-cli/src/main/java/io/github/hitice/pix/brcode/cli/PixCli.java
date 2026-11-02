@@ -135,7 +135,7 @@ public final class PixCli {
         }
         options.put("key", key);
         options.put("amount", ask("Valor, por exemplo 0,01 (vazio deixa quem paga digitar): "));
-        options.put("name", ask("Seu nome ou da loja, recomendado (Enter usa \"" + PixForm.DEFAULT_NAME + "\"): "));
+        options.put("name", ask("Estabelecimento, recomendado (Enter usa \"" + PixForm.DEFAULT_NAME + "\"): "));
         options.put("city", ask("Cidade no QR, at\u00e9 15 caracteres (Enter usa \"" + PixForm.DEFAULT_CITY + "\"): "));
         options.put("txid", ask("Identificador, letras e n\u00fameros at\u00e9 25 (opcional): "));
         options.put("description", ask("Descri\u00e7\u00e3o (opcional): "));

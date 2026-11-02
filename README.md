@@ -256,7 +256,7 @@ ou conferir um código suspeito. Baixe o `pix.jar` da
 
 ![O programa gerando um Pix: chave reconhecida enquanto você digita, QR Code e copia e cola prontos](docs/images/janela-receber.png)
 
-A aba **Conferir código** mostra para quem vai o dinheiro, ou aponta o problema:
+A aba **Conferência** mostra para quem vai o dinheiro, ou aponta o problema:
 
 ![Conferindo um copia e cola com o valor alterado: o programa aponta que o código foi corrompido](docs/images/janela-conferir.png)
 
@@ -273,7 +273,7 @@ java -jar pix.jar ler "00020126...6304ABCD"
 | --- | --- |
 | `--chave` | Chave Pix de quem recebe (a única obrigatória) |
 | `--valor` | Valor em reais (`12,34`, `12.34` ou `R$ 1.234,56`); sem ele, quem paga digita |
-| `--nome` | Seu nome ou da loja, até 25 caracteres (recomendado) |
+| `--nome` | Nome do estabelecimento, até 25 caracteres (recomendado) |
 | `--cidade` | Cidade, até 15 caracteres |
 | `--txid` | Identificador do pedido, letras e números, até 25 |
 | `--descricao` | Mensagem para quem paga |

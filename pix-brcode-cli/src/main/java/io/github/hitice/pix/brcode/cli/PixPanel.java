@@ -74,15 +74,15 @@ final class PixPanel extends JPanel {
     final JTextArea payload = new JTextArea(3, 30);
     final JToggleButton moreOptions = new JToggleButton("Mais opções  ▸");
     final JPanel options = new JPanel(new GridBagLayout());
-    final JButton copy = new JButton("Copiar código");
-    final JButton save = new JButton("Salvar imagem");
+    final JButton copy = new JButton("Copiar");
+    final JButton save = new JButton("Salvar");
     final JTextArea pasted = new JTextArea(4, 50);
     final JLabel checkBadge = new JLabel(" ");
     final JTextArea checkResult = new JTextArea(8, 50);
     final JButton check = new JButton("Conferir");
 
     private final Timer typing = new Timer(TYPING_DELAY_MS, e -> generate());
-    private final Timer copiedReset = new Timer(2000, e -> copy.setText("Copiar código"));
+    private final Timer copiedReset = new Timer(2000, e -> copy.setText("Copiar"));
     private transient BrCode current;
 
     PixPanel() {
@@ -91,8 +91,8 @@ final class PixPanel extends JPanel {
         typing.setRepeats(false);
         copiedReset.setRepeats(false);
         JTabbedPane tabs = new JTabbedPane();
-        tabs.addTab("Receber", receiveTab());
-        tabs.addTab("Conferir código", checkTab());
+        tabs.addTab("Gerador", receiveTab());
+        tabs.addTab("Conferência", checkTab());
         add(tabs, BorderLayout.CENTER);
     }
 
@@ -100,8 +100,7 @@ final class PixPanel extends JPanel {
 
     private JComponent receiveTab() {
         JPanel page = page();
-        page.add(header("Receber por Pix",
-                "Digite a sua chave e o valor. O QR Code e o código copia e cola aparecem na hora."),
+        page.add(header("Gerador de Pix", "Digite os dados para gerar o QR Code."),
                 BorderLayout.NORTH);
         JPanel cards = new JPanel(new GridBagLayout());
         cards.setOpaque(false);
@@ -137,7 +136,7 @@ final class PixPanel extends JPanel {
         card.add(amount, c);
         card.add(small("Deixe vazio para quem paga digitar o valor.", MUTED), c);
         c.insets = new Insets(12, 0, 4, 0);
-        card.add(label("Seu nome ou da loja"), c);
+        card.add(label("Estabelecimento"), c);
         c.insets = new Insets(0, 0, 4, 0);
         card.add(name, c);
         card.add(small("Recomendado: é o nome que quem paga vê ao ler o QR Code.", MUTED), c);
@@ -334,8 +333,8 @@ final class PixPanel extends JPanel {
 
     private JComponent checkTab() {
         JPanel page = page();
-        page.add(header("Conferir um código Pix",
-                "Cole um copia e cola para ver para quem vai o dinheiro e se o código está íntegro."),
+        page.add(header("Conferência de Pix",
+                "Cole os dados para verificar e conferir a integridade do seu link."),
                 BorderLayout.NORTH);
         Card card = new Card(new BorderLayout(0, 12));
         pasted.setLineWrap(true);
@@ -375,7 +374,7 @@ final class PixPanel extends JPanel {
         List<String> problems = PixForm.problems(text);
         if (!problems.isEmpty()) {
             checkBadge.setForeground(ERROR);
-            checkBadge.setText("✕  Código com problema");
+            checkBadge.setText("✕  Não foi possível realizar a conferência deste código");
             checkResult.setText("Código Pix inválido:\n  " + String.join("\n  ", problems));
             return;
         }

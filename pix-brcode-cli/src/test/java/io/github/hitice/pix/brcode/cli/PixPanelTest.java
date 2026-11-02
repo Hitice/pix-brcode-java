@@ -130,7 +130,7 @@ class PixPanelTest {
 
         panel.pasted.setText(payload.replace("5.00", "9.00"));
         panel.check();
-        assertThat(panel.checkBadge.getText()).contains("Código com problema");
+        assertThat(panel.checkBadge.getText()).contains("Não foi possível realizar a conferência");
         assertThat(panel.checkResult.getText()).contains("o código foi alterado ou corrompido");
     }
 
